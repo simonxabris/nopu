@@ -22,11 +22,9 @@ async fn main() -> Result<()> {
 
     let folders = find_node_modules(&cwd).unwrap();
 
-    match cli.commands {
-        Some(command) => match command {
-            Commands::List => {
+    match &cli.commands {
+        Some(Commands::List) => { 
                 list_folders(&folders);
-            }
         },
         None => {
             delete_files(folders.clone()).await;
