@@ -12,7 +12,7 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    List
+    List,
 }
 
 #[tokio::main]
@@ -23,9 +23,9 @@ async fn main() -> Result<()> {
     let folders = find_node_modules(&cwd).unwrap();
 
     match &cli.commands {
-        Some(Commands::List) => { 
-                list_folders(&folders);
-        },
+        Some(Commands::List) => {
+            list_folders(&folders);
+        }
         None => {
             delete_files(folders.clone()).await;
         }
@@ -37,9 +37,23 @@ async fn main() -> Result<()> {
 fn list_folders(folders: &Vec<path::PathBuf>) {
     println!("Found the following node_modules folders:");
 
+    let mut sum_of_file_sizes: u64 = 0;
     for folder in folders {
-        println!("- {}", folder.display())
+        let metadata = folder.metadata().unwrap();
+
+        sum_of_file_sizes += metadata.len();
+
+        println!(
+            "- {}. size: {}",
+            folder.display(),
+            format_file_size(metadata.len())
+        )
     }
+
+    println!(
+        "Total size of node_modules: {}",
+        format_file_size(sum_of_file_sizes)
+    )
 }
 
 async fn delete_files(folders: Vec<path::PathBuf>) {
@@ -77,7 +91,7 @@ async fn delete_files(folders: Vec<path::PathBuf>) {
         accumulated_size += file_size.unwrap();
     }
 
-    println!("Freed up {} GB", accumulated_size / 1024 / 1024 / 1024);
+    println!("Freed up {}", format_file_size(accumulated_size));
 }
 
 fn find_node_modules<P: AsRef<path::Path>>(path: P) -> Result<Vec<path::PathBuf>> {
@@ -91,7 +105,6 @@ fn find_node_modules<P: AsRef<path::Path>>(path: P) -> Result<Vec<path::PathBuf>
 
         if current_path.is_dir() && current_path.to_str().unwrap().contains("node_modules") {
             paths.push(current_path);
-            break;
         } else if current_path.is_dir() {
             let found_paths = find_node_modules(&current_path)?;
             paths.extend_from_slice(&found_paths);
@@ -99,4 +112,17 @@ fn find_node_modules<P: AsRef<path::Path>>(path: P) -> Result<Vec<path::PathBuf>
     }
 
     Ok(paths)
+}
+
+fn format_file_size(size: u64) -> String {
+    let units = ["Bytes", "KB", "MB", "GB"];
+    let mut size_f64 = size as f64;
+
+    let mut unit_index = 0;
+    while size_f64 >= 1024.0 && unit_index < units.len() - 1 {
+        size_f64 /= 1024.0;
+        unit_index += 1;
+    }
+
+    format!("{:.1} {}", size_f64, units[unit_index])
 }
